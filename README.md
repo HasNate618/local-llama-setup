@@ -102,3 +102,31 @@ Appendix: example curl (single-line JSON body created by python)
   curl -sS -X POST 'http://127.0.0.1:8081/v1/chat/completions' -H 'Content-Type: application/json' --data-binary @/tmp/body.json
 
 If you want, I can also add a .gitignore file and commit it. I can also tune qwen-moe defaults (ngl -> 9) and commit that change — tell me which you'd like next.
+
+Benchmarks
+---------
+Summary of recent focused runs (stored under /home/nate/AI/logs):
+
+- Best observed generation throughput: 15.36 tok/s (file: /home/nate/AI/logs/high_conf_sweep_20260424_021144/qwen36_ngl10_kv_nc0-medium-nc0.json).
+- Typical stable cluster: 12–14 tok/s across other tuned runs (many files named qwen36_ngl{9,10,11,12}_* in the same directory).
+
+Top-performing config (used for the best run):
+- --n-gpu-layers 10
+- --n-cpu-moe 0
+- --kv-unified
+- --no-mmproj-offload (mmproj on GPU)
+- --ctx-size 131072
+- --batch-size 512 --ubatch-size 256
+
+Notes and reproducibility
+- These numbers were collected on an RTX 4060 laptop GPU (~8 GB VRAM) and are sensitive to small placement changes; always re-run the top configs 3× and take the median.
+- Per-run artifacts saved in /home/nate/AI/logs/high_conf_sweep_20260424_021144/ include: server logs (server-*.log), bench outputs (.json), and nvidia-smi traces (-nvidia-smi.log).
+
+Quick checks
+- View the best run output:
+  cat /home/nate/AI/logs/high_conf_sweep_20260424_021144/qwen36_ngl10_kv_nc0-medium-nc0.json
+- Tail the server log for the matching run:
+  tail -n 200 /home/nate/AI/logs/high_conf_sweep_20260424_021144/server-qwen36_ngl10_kv_nc0-nc0.log
+
+Recommendation
+- Before publishing or benchmarking repeatedly, run each top config 3× and store the server log + nvidia-smi trace for each repeat under a descriptive subfolder. This repository keeps only launcher + docs; bench artifacts live in the logs directory.
