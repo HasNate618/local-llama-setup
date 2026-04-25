@@ -111,6 +111,24 @@ Commands:
 EOF
 }
 
+# Backward-compatible dispatcher function for interactive shells
+llama() {
+  local cmd=$1; shift || true
+  case "$cmd" in
+    qwen-moe) qwen-moe "$@" ;;
+    qwen-moe-unsloth) qwen-moe-unsloth "$@" ;;
+    gemma-26b) gemma-26b "$@" ;;
+    gemma-4b) gemma-4b "$@" ;;
+    sushi) sushi "$@" ;;
+    stop) stop "$@" ;;
+    status) status "$@" ;;
+    logs) logs "$@" ;;
+    help|""|*) help ;;
+  esac
+}
+
+export -f llama >/dev/null 2>&1 || true
+
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   case "$1" in
   qwen-moe) qwen-moe ;;
