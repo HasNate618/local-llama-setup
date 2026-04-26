@@ -10,10 +10,8 @@ SERVER_PORT="8081"
 mkdir -p "$LOGS_DIR"
 PIDFILE="$LOGS_DIR/llama-server.pid"
 
-QWEN_MODEL="$MODELS_DIR/Qwen3.6-35B-A3B-Plus-Uncensored-Q4_K_P.gguf"
-QWEN_MMP="$MODELS_DIR/mmproj-Qwen3.6-35B-A3B-Uncensored.f16.gguf"
-QWEN_UD_MODEL="$MODELS_DIR/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"
-QWEN_UD_MMP="$MODELS_DIR/mmproj-F16.gguf"
+QWEN_MODEL="$MODELS_DIR/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"
+QWEN_MMP="$MODELS_DIR/mmproj-F16.gguf"
 GEMMA_26B="$MODELS_DIR/gemma-4-26B-A4B-it-uncensored-heretic-Q5_K_M.gguf"
 GEMMA_26B_MMP="$MODELS_DIR/gemma-4-26B-A4B-it-mmproj-BF16.gguf"
 GEMMA_4B="$MODELS_DIR/gemma-4-E4B-it-Q4_K_M.gguf"
@@ -45,16 +43,8 @@ _start() {
 
 qwen-moe() {
   if [ ! -f "$QWEN_MMP" ]; then echo "Missing mmproj: $QWEN_MMP"; return 1; fi
-  # tuned profile
-  # Use the winning benchmark flags as defaults: ngl=10, nc=0, kv-unified, mmproj on-GPU
-  _start "$QWEN_MODEL" qwen-moe --mmproj "$QWEN_MMP" --no-mmproj-offload --kv-unified --n-gpu-layers 10 --no-mmap --cache-ram 0 --ctx-size 131072 --batch-size 512 --ubatch-size 256 --n-cpu-moe 0 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on -ctk q8_0 -ctv q8_0 --reasoning on --reasoning-budget 256 --temp 0.6 --top-p 0.95 --top-k 20
-}
-
-qwen-moe-unsloth() {
-  if [ ! -f "$QWEN_UD_MODEL" ]; then echo "Missing UD model: $QWEN_UD_MODEL"; return 1; fi
-  if [ ! -f "$QWEN_UD_MMP" ]; then echo "Missing mmproj: $QWEN_UD_MMP"; return 1; fi
   # Best observed config from targeted tuning on RTX4060 (~8GB)
-  _start "$QWEN_UD_MODEL" qwen-moe-unsloth --mmproj "$QWEN_UD_MMP" --no-mmproj-offload --kv-unified --n-gpu-layers 12 --no-mmap --cache-ram 0 --ctx-size 131072 --batch-size 256 --ubatch-size 128 --n-cpu-moe 0 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on -ctk q8_0 -ctv q8_0 --reasoning on --reasoning-budget 256 --temp 0.6 --top-p 0.95 --top-k 20
+  _start "$QWEN_MODEL" qwen-moe --mmproj "$QWEN_MMP" --no-mmproj-offload --kv-unified --n-gpu-layers 12 --no-mmap --cache-ram 0 --ctx-size 131072 --batch-size 256 --ubatch-size 128 --n-cpu-moe 0 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on -ctk q8_0 -ctv q8_0 --reasoning on --reasoning-budget 256 --temp 0.6 --top-p 0.95 --top-k 20
 }
 
 gemma-26b() {
@@ -132,7 +122,7 @@ export -f llama >/dev/null 2>&1 || true
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   case "$1" in
   qwen-moe) qwen-moe ;;
-    qwen-moe-unsloth) qwen-moe-unsloth ;;
+    
   gemma-26b) gemma-26b ;;
     gemma-4b) gemma-4b ;;
     sushi) sushi ;;
