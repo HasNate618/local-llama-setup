@@ -1,0 +1,28 @@
+{
+  "model": "qwen-3.6-35b-a3b-q4km",
+  "messages": [
+    { "role": "user", "content": [ { "type": "text", "text": "User message 1: some filler text to increase tokens." } ] },
+    { "role": "assistant", "content": [ { "type": "text", "text": "Assistant reply 1: ack 1." } ] },
+    { "role": "user", "content": [ { "type": "text", "text": "User message 2: some filler text to increase tokens." } ] },
+    { "role": "assistant", "content": [ { "type": "text", "text": "Assistant reply 2: ack 2." } ] },
+    { "role": "user", "content": [ { "type": "text", "text": "User message 3: some filler text to increase tokens." } ] },
+    { "role": "assistant", "content": [ { "type": "text", "text": "Assistant reply 3: ack 3." } ] },
+    { "role": "user", "content": [ { "type": "text", "text": "User message 4: some filler text to increase tokens." } ] },
+    { "role": "assistant", "content": [ { "type": "text", "text": "Assistant reply 4: ack 4." } ] },
+    { "role": "user", "content": [ { "type": "text", "text": "User message 5: some filler text to increase tokens." } ] },
+    { "role": "assistant", "content": [ { "type": "text", "text": "Assistant reply 5: ack 5." } ] },
+    { "role": "user", "content": [ { "type": "text", "text": "User message 6: some filler text to increase tokens." } ] },
+    { "role": "assistant", "content": [ { "type": "text", "text": "Assistant reply 6: ack 6." } ] },
+    { "role": "user", "content": [ { "type": "text", "text": "User message 7: some filler text to increase tokens." } ] },
+    { "role": "assistant", "content": [ { "type": "text", "text": "Assistant reply 7: ack 7." } ] },
+    { "role": "user", "content": [ { "type": "text", "text": "User message 8: some filler text to increase tokens." } ] },
+    { "role": "assistant", "content": [ { "type": "text", "text": "Assistant reply 8: ack 8." } ] },
+    { "role": "user", "content": [ { "type": "text", "text": "User message 9: some filler text to increase tokens." } ] },
+    { "role": "assistant", "content": [ { "type": "text", "text": "Assistant reply 9: ack 9." } ] },
+    { "role": "user", "content": [ { "type": "text", "text": "User message 10: some filler text to increase tokens." } ] },
+    { "role": "assistant", "content": [ { "type": "text", "text": "Assistant reply 10: ack 10." } ] },
+    { "role": "user", "content": [ { "type": "text", "text": "Summarize the conversation in one sentence." } ] }
+  ],
+  "temperature": 0.2,
+  "max_tokens": 0
+}

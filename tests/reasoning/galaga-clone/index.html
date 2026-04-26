@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galaga Clone</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a16;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        .game-container {
+            position: relative;
+            border: 4px solid #1a1a3e;
+            border-radius: 8px;
+            box-shadow: 0 0 50px rgba(0, 150, 255, 0.3);
+            background: linear-gradient(135deg, #0d0d24 0%, #1a1a3e 50%, #0d0d24 100%);
+        }
+
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 25px;
+            background: rgba(0, 0, 0, 0.6);
+            border-bottom: 2px solid #1a1a3e;
+        }
+
+        .game-title {
+            color: #0096ff;
+            font-size: 28px;
+            font-weight: bold;
+            text-shadow: 0 0 20px rgba(0, 150, 255, 0.8);
+            letter-spacing: 2px;
+        }
+
+        .game-title span {
+            color: #ffd700;
+        }
+
+        .stats-panel {
+            display: flex;
+            gap: 30px;
+        }
+
+        .stat {
+            color: #fff;
+            font-size: 16px;
+            text-shadow: 0 0 10px rgba(0, 150, 255, 0.5);
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            font-size: 20px;
+        }
+
+        canvas {
+            display: block;
+            background: transparent;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            text-align: center;
+            padding: 40px;
+        }
+
+        .overlay.hidden {
+            display: none;
+        }
+
+        .overlay h1 {
+            font-size: 72px;
+            color: #0096ff;
+            text-shadow: 0 0 40px rgba(0, 150, 255, 0.8);
+            margin-bottom: 20px;
+            letter-spacing: 5px;
+        }
+
+        .overlay p {
+            font-size: 18px;
+            color: #aaa;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .overlay .controls {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 20px 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: left;
+        }
+
+        .overlay .controls h3 {
+            color: #ffd700;
+            margin-bottom: 15px;
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .overlay .controls ul {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px 20px;
+        }
+
+        .overlay .controls li {
+            color: #ccc;
+            font-size: 14px;
+        }
+
+        .overlay .controls kbd {
+            background: #333;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            color: #fff;
+            border: 1px solid #555;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #0096ff 0%, #0077cc 100%);
+            color: white;
+            border: none;
+            padding: 18px 50px;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 4px 20px rgba(0, 150, 255, 0.4);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(0, 150, 255, 0.6);
+            background: linear-gradient(135deg, #00aaff 0%, #0088dd 100%);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+        }
+
+        .hud-right {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
+        }
+
+        .hud-item {
+            margin-bottom: 5px;
+        }
+
+        .hud-label {
+            color: #888;
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+
+        .hud-value {
+            color: #ffd700;
+            font-weight: bold;
+        }
+
+        .boss-hud {
+            position: absolute;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 400px;
+        }
+
+        .boss-bar-container {
+            background: #333;
+            border: 2px solid #555;
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+        }
+
+        .boss-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff0000, #ff6600);
+            transition: width 0.1s ease;
+            box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+        }
+
+        .boss-name {
+            color: white;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            text-align: center;
+            margin-top: 5px;
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+        }
+
+        .boss-name span {
+            color: #ff6600;
+            font-weight: bold;
+        }
+
+        .powerup-display {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .powerup-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 20px;
+            color: white;
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .powerup-icon.active {
+            opacity: 1;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .boss-active .boss-hud {
+            animation: pulse 0.5s ease-in-out infinite;
+        }
+
+        .game-over-stats {
+            display: none;
+        }
+
+        .game-over-stats.visible {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <div class="game-title">GALAGA<span>CLONE</span></div>
+            <div class="stats-panel">
+                <div class="stat">
+                    <div class="stat-label">Score</div>
+                    <div class="stat-value" id="score">0</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Lives</div>
+                    <div class="stat-value" id="lives">3</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-label">Level</div>
+                    <div class="stat-value" id="level">1</div>
+                </div>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <div class="hud">
+            <div class="hud-item">
+                <div class="hud-label">Wave</div>
+                <div class="hud-value" id="wave">1</div>
+            </div>
+            <div class="hud-item">
+                <div class="hud-label">Enemies</div>
+                <div class="hud-value" id="enemies">0</div>
+            </div>
+        </div>
+
+        <div class="hud-right">
+            <div class="hud-item">
+                <div class="hud-label">High Score</div>
+                <div class="hud-value" id="highScore">0</div>
+            </div>
+        </div>
+
+        <div class="boss-hud">
+            <div class="boss-bar-container">
+                <div class="boss-bar-fill" id="bossBar"></div>
+            </div>
+            <div class="boss-name" id="bossName"></div>
+        </div>
+
+        <div class="powerup-display" id="powerups"></div>
+
+        <!-- Start Screen -->
+        <div class="overlay" id="startScreen">
+            <h1>GALAGA CLONE</h1>
+            <p>Defend Earth from the alien invasion! Pilot your ship through waves of enemies, collect power-ups, and survive as long as you can.</p>
+            <div class="controls">
+                <h3>Controls</h3>
+                <ul>
+                    <li><kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> - Move Left/Right</li>
+                    <li><kbd>↑</kbd> or <kbd>W</kbd> - Move Up/Down</li>
+                    <li><kbd>Space</kbd> or <kbd>Click</kbd> - Shoot</li>
+                    <kbd>SHIFT</kbd> - Boost (when powered up)</li>
+                    <li><kbd>P</kbd> - Pause Game</li>
+                </ul>
+            </div>
+            <button class="btn" onclick="startGame()">START MISSION</button>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div class="overlay hidden" id="gameOverScreen">
+            <h1 style="color: #ff0040; text-shadow: 0 0 40px rgba(255, 0, 64, 0.8);">GAME OVER</h1>
+            <div class="game-over-stats">
+                <p style="font-size: 24px; margin-bottom: 10px;">Final Score: <span id="finalScore" style="color: #ffd700;"></span></p>
+                <p style="margin-bottom: 10px;">Enemies Destroyed: <span id="enemiesKilled"></span></p>
+                <p style="margin-bottom: 10px;">Waves Survived: <span id="wavesSurvived"></span></p>
+                <p style="margin-bottom: 20px;">Best Score: <span id="bestScore" style="color: #ffd700; font-weight: bold;"></span></p>
+            </div>
+            <button class="btn" onclick="resetGame()">PLAY AGAIN</button>
+        </div>
+
+        <!-- Pause Screen -->
+        <div class="overlay hidden" id="pauseScreen">
+            <h1>PAUSED</h1>
+            <p>Press <kbd>P</kbd> to resume</p>
+            <button class="btn" onclick="togglePause()">RESUME</button>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>

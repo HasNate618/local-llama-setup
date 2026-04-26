@@ -1,0 +1,253 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage:
+  itt <image_path> [question]
+  itt <image_path> --length <n> [question]
+  itt <image_path> <n> [question]
+  itt <image_path> --transcribe | -t
+
+Environment:
+  COHERE_API_KEY              Required
+  ITT_MODEL                   Optional (default: c4ai-aya-vision-8b)
+  ITT_SYSTEM_PROMPT           Optional system prompt override
+  ITT_MAX_TOKENS              Optional override for token budget
+  ITT_TEMPERATURE             Optional (default: 0.2)
+
+Example:
+  itt ./screenshot.png
+  itt ./screenshot.png --length 4 "Summarize what this UI does and suggest improvements."
+  itt ./screenshot.png -t
+EOF
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
+if [[ $# -lt 1 ]]; then
+  usage
+  exit 1
+fi
+
+if ! command -v curl >/dev/null 2>&1; then
+  echo "Error: curl is required but not installed." >&2
+  exit 1
+fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "Error: python3 is required but not installed." >&2
+  exit 1
+fi
+
+if [[ -z "${COHERE_API_KEY:-}" ]]; then
+  echo "Error: COHERE_API_KEY is not set." >&2
+  exit 1
+fi
+
+IMAGE_PATH="$1"
+shift || true
+
+if [[ ! -f "$IMAGE_PATH" ]]; then
+  echo "Error: image file not found: $IMAGE_PATH" >&2
+  exit 1
+fi
+
+TRANSCRIBE_MODE=0
+LENGTH_SENTENCES=1
+
+if [[ "${1:-}" == "--transcribe" || "${1:-}" == "-t" ]]; then
+  TRANSCRIBE_MODE=1
+  shift
+elif [[ "${1:-}" == "-l" || "${1:-}" == "--length" ]]; then
+  if [[ -z "${2:-}" || ! "$2" =~ ^[0-9]+$ ]]; then
+    echo "Error: --length requires a positive integer." >&2
+    exit 1
+  fi
+  LENGTH_SENTENCES="$2"
+  shift 2
+elif [[ "${1:-}" =~ ^[0-9]+$ ]]; then
+  LENGTH_SENTENCES="$1"
+  shift
+fi
+
+if [[ "$LENGTH_SENTENCES" -lt 1 ]]; then
+  echo "Error: length must be at least 1." >&2
+  exit 1
+fi
+
+MODEL="${ITT_MODEL:-c4ai-aya-vision-8b}"
+TEMPERATURE="${ITT_TEMPERATURE:-0.2}"
+
+if [[ $TRANSCRIBE_MODE -eq 1 ]]; then
+  QUESTION="Extract all text visible in this image. List every word, number, and character you can see. If there is absolutely no text visible, respond with exactly 'No text'."
+  MAX_TOKENS="${ITT_MAX_TOKENS:-300}"
+  SYSTEM_PROMPT="${ITT_SYSTEM_PROMPT:-You are an OCR text extraction tool. Your only job is to extract and return the visible text from images. Return the exact text you see, preserving formatting when possible. Do not describe the image, do not add commentary, only return the text itself.}"
+else
+  QUESTION="${*:-Describe this image.}"
+  MAX_TOKENS="${ITT_MAX_TOKENS:-150}"
+  SYSTEM_PROMPT="${ITT_SYSTEM_PROMPT:-You are a visual assistant. Provide a brief 2-3 sentence description of the image. Be concise but informative. No bullets, no headings, no lists.}"
+fi
+
+TMP_JSON="$(mktemp)"
+TMP_RESP="$(mktemp)"
+cleanup() {
+  rm -f "$TMP_JSON" "$TMP_RESP"
+}
+trap cleanup EXIT
+
+python3 - "$IMAGE_PATH" "$QUESTION" "$SYSTEM_PROMPT" "$MODEL" "$MAX_TOKENS" "$TEMPERATURE" "$LENGTH_SENTENCES" "$TRANSCRIBE_MODE" "$TMP_JSON" <<'PY'
+import base64
+import json
+import mimetypes
+import pathlib
+import sys
+
+image_path = pathlib.Path(sys.argv[1]).expanduser().resolve()
+question = sys.argv[2]
+system_prompt = sys.argv[3]
+model = sys.argv[4]
+max_tokens = int(sys.argv[5])
+temperature = float(sys.argv[6])
+length_sentences = int(sys.argv[7])
+transcribe_mode = int(sys.argv[8])
+out_path = pathlib.Path(sys.argv[9])
+
+mime, _ = mimetypes.guess_type(str(image_path))
+if not mime:
+    mime = "application/octet-stream"
+
+encoded = base64.b64encode(image_path.read_bytes()).decode("ascii")
+data_url = f"data:{mime};base64,{encoded}"
+
+payload = {
+    "model": model,
+    "stream": False,
+    "temperature": temperature,
+    "max_tokens": max_tokens,
+    "messages": [
+        {"role": "system", "content": system_prompt},
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": f"{question}\n\nKeep the answer to one brief sentence."},
+                {"type": "image_url", "image_url": {"url": data_url}},
+            ],
+        },
+    ],
+}
+out_path.write_text(json.dumps(payload), encoding="utf-8")
+PY
+
+spinner() {
+  local pid="$1"
+  local msg="$2"
+  local frames='|/-\'
+  local i=0
+  local start
+  start="$(date +%s)"
+
+  while kill -0 "$pid" >/dev/null 2>&1; do
+    local now elapsed frame
+    now="$(date +%s)"
+    elapsed="$((now - start))"
+    frame="${frames:i%${#frames}:1}"
+    printf "\r[%s] %s (%ss)" "$frame" "$msg" "$elapsed"
+    i=$((i + 1))
+    sleep 0.1
+  done
+  printf "\r\033[K"
+}
+
+curl -sS \
+  -X POST "https://api.cohere.com/v2/chat" \
+  -H "Authorization: Bearer ${COHERE_API_KEY}" \
+  -H "Content-Type: application/json" \
+  --data @"$TMP_JSON" >"$TMP_RESP" &
+CURL_PID=$!
+
+if [[ $TRANSCRIBE_MODE -eq 1 ]]; then
+  spinner "$CURL_PID" "Transcribing image text"
+else
+  spinner "$CURL_PID" "Analyzing image with Cohere"
+fi
+wait "$CURL_PID" || {
+  echo "Request failed." >&2
+  cat "$TMP_RESP" >&2 || true
+  exit 1
+}
+
+python3 - "$TMP_RESP" "$TRANSCRIBE_MODE" <<'PY'
+import json
+import pathlib
+import re
+import sys
+
+resp_path = pathlib.Path(sys.argv[1])
+transcribe_mode = int(sys.argv[2])
+raw = resp_path.read_text(encoding="utf-8", errors="replace").strip()
+
+if not raw:
+    print("Error: empty response from Cohere.", file=sys.stderr)
+    sys.exit(1)
+
+try:
+    data = json.loads(raw)
+except json.JSONDecodeError:
+    print("Error: non-JSON response from Cohere:", file=sys.stderr)
+    print(raw, file=sys.stderr)
+    sys.exit(1)
+
+if "message" not in data:
+    msg = data.get("message") or data.get("error") or data
+    print("Error response from Cohere:", file=sys.stderr)
+    print(json.dumps(msg, indent=2, ensure_ascii=False), file=sys.stderr)
+    sys.exit(1)
+
+content = data.get("message", {}).get("content", [])
+texts = [item.get("text", "") for item in content if isinstance(item, dict) and item.get("type") == "text"]
+answer = "\n".join(t for t in texts if t).strip()
+
+if transcribe_mode:
+    answer = answer.strip()
+    # Debug: show raw response if empty
+    if not answer:
+        print(f"[DEBUG] Raw response: {json.dumps(data, indent=2)}", file=sys.stderr)
+        print("No text")
+    elif answer.lower() == "no text":
+        print("No text")
+    else:
+        print(answer)
+else:
+    def one_sentence(text: str) -> str:
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        if not lines:
+            return ""
+
+        cleaned = []
+        for line in lines:
+            line = re.sub(r"^[>\-\*\u2022]+\s*", "", line)
+            line = re.sub(r"^\d+[\).\]]\s*", "", line)
+            cleaned.append(line)
+
+        text = re.sub(r"\s+", " ", " ".join(cleaned)).strip()
+        if not text:
+            return ""
+
+        match = re.search(r"^(.+?[.!?])(?:\s+|$)", text)
+        if match:
+            return match.group(1).strip()
+
+        return text.rstrip(".!?") + "."
+
+    answer = one_sentence(answer)
+
+    if not answer:
+        print("No text output in response. Full payload:")
+        print(json.dumps(data, indent=2, ensure_ascii=False))
+    else:
+        print(answer)
+PY

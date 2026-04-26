@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galaga Clone</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(180deg, #0a0a20 0%, #000 50%, #0a0a20 100%);
+        }
+
+        #game-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            padding: 20px;
+        }
+
+        .hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 100%;
+        }
+
+        .score-box, .lives-box {
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 10px 20px;
+            border: 2px solid #4a9eff;
+            border-radius: 5px;
+            font-size: 24px;
+            text-shadow: 0 0 10px #4a9eff;
+        }
+
+        .score-box span { color: #ffeb3b; }
+        .lives-box span { color: #ff4444; }
+
+        #level-display {
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 10px 20px;
+            border: 2px solid #00ff88;
+            border-radius: 5px;
+            font-size: 24px;
+            text-shadow: 0 0 10px #00ff88;
+        }
+
+        #start-screen, #game-over-screen, #victory-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: auto;
+            z-index: 100;
+        }
+
+        .screen-title {
+            font-size: 72px;
+            color: #4a9eff;
+            text-shadow: 0 0 30px #4a9eff, 0 0 60px #00ffff;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .screen-subtitle {
+            font-size: 28px;
+            color: #fff;
+            margin-bottom: 40px;
+            text-align: center;
+            max-width: 600px;
+            line-height: 1.6;
+        }
+
+        .btn {
+            background: linear-gradient(180deg, #4a9eff 0%, #0066cc 100%);
+            color: white;
+            border: none;
+            padding: 20px 60px;
+            font-size: 24px;
+            font-family: inherit;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(74, 158, 255, 0.5);
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 40px rgba(74, 158, 255, 0.8);
+        }
+
+        .controls-info {
+            margin-top: 40px;
+            color: #888;
+            font-size: 16px;
+            text-align: center;
+            line-height: 1.8;
+        }
+
+        .key {
+            display: inline-block;
+            background: #333;
+            color: #fff;
+            padding: 5px 12px;
+            border-radius: 4px;
+            margin: 0 3px;
+            font-size: 14px;
+            border-bottom: 2px solid #1a1a1a;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #boss-hud {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(138, 43, 226, 0.9);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            border: 3px solid #ff00ff;
+            box-shadow: 0 0 30px rgba(138, 43, 226, 0.5);
+            min-width: 200px;
+        }
+
+        #boss-hud h3 {
+            margin-bottom: 10px;
+            text-align: center;
+            font-size: 18px;
+            text-transform: uppercase;
+        }
+
+        .boss-bar-container {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        #boss-bar {
+            height: 20px;
+            background: linear-gradient(90deg, #ff00ff, #ff66aa, #ff00ff);
+            transition: width 0.3s ease;
+        }
+
+        #boss-name {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ff00ff;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 10px #ff00ff;
+            white-space: nowrap;
+        }
+
+        .powerup-indicator {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+        }
+
+        .powerup-badge {
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 8px 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            border: 2px solid;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .powerup-badge.active {
+            opacity: 1;
+        }
+
+        .powerup-shield { border-color: #00ff88; color: #00ff88; box-shadow: 0 0 10px #00ff88; }
+        .powerup-magnet { border-color: #ffff00; color: #ffff00; box-shadow: 0 0 10px #ffff00; }
+        .powerup-dash { border-color: #ff4444; color: #ff4444; box-shadow: 0 0 10px #ff4444; }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .boss-active #boss-hud {
+            animation: pulse 1s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+
+        <div id="ui-layer">
+            <div class="hud-top">
+                <div class="score-box">SCORE: <span id="score">0</span></div>
+                <div id="level-display">WAVE: <span id="wave">1</span></div>
+                <div class="lives-box">LIVES: <span id="lives">3</span></div>
+            </div>
+
+            <div id="boss-hud" class="hidden">
+                <div id="boss-name"></div>
+                <h3>Boss HP</h3>
+                <div class="boss-bar-container">
+                    <div id="boss-bar"></div>
+                </div>
+            </div>
+
+            <div class="powerup-indicator hidden">
+                <div class="powerup-badge powerup-shield">SHIELD</div>
+                <div class="powerup-badge powerup-magnet">MAGNET</div>
+                <div class="powerup-badge powerup-dash">DASH</div>
+            </div>
+        </div>
+
+        <div id="start-screen">
+            <h1 class="screen-title">GALAGA CLONE</h1>
+            <p class="screen-subtitle">
+                Defend Earth from the alien invasion!<br><br>
+                Navigate through waves of enemy ships.<br>
+                Destroy boss battles and collect power-ups.
+            </p>
+            <button class="btn" onclick="startGame()">START MISSION</button>
+            <div class="controls-info">
+                <span class="key">W</span> <span class="key">A</span> <span class="key">S</span> <span class="key">D</span> or
+                <span class="key">ARROWS</span> to move<br>
+                <span class="key">SPACE</span> to shoot<br>
+                <span class="key">P</span> to pause<br>
+                <span class="key">R</span> to restart
+            </div>
+        </div>
+
+        <div id="game-over-screen" class="hidden">
+            <h1 class="screen-title" style="color: #ff4444;">MISSION FAILED</h1>
+            <p class="screen-subtitle">Final Score: <span id="final-score">0</span></p>
+            <button class="btn" onclick="resetGame()">TRY AGAIN</button>
+        </div>
+
+        <div id="victory-screen" class="hidden">
+            <h1 class="screen-title" style="color: #00ff88;">VICTORY!</h1>
+            <p class="screen-subtitle">All threats eliminated!<br>Final Score: <span id="victory-score">0</span></p>
+            <button class="btn" onclick="resetGame()">PLAY AGAIN</button>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>

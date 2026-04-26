@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galaga Clone - Space Shooter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background: linear-gradient(to bottom, #0a0a2e 0%, #1a1a4e 50%, #0a0a2e 100%);
+            border: 4px solid #1a4d7a;
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(26, 77, 122, 0.5);
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+        }
+
+        .hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            color: #0ff;
+            font-size: 18px;
+            text-shadow: 0 0 10px #0ff;
+            pointer-events: none;
+        }
+
+        .hud-item {
+            background: rgba(0, 20, 40, 0.7);
+            padding: 8px 15px;
+            border-radius: 5px;
+            border: 1px solid #0ff;
+        }
+
+        .start-screen, .game-over-screen, .pause-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.85);
+            pointer-events: auto;
+            z-index: 100;
+        }
+
+        .screen-title {
+            font-size: 48px;
+            color: #ff6b6b;
+            text-shadow: 0 0 20px #ff6b6b, 0 0 40px #ff0000;
+            margin-bottom: 20px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .screen-subtitle {
+            font-size: 20px;
+            color: #0ff;
+            text-shadow: 0 0 10px #0ff;
+            margin-bottom: 30px;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .controls-info {
+            background: rgba(0, 20, 40, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #0ff;
+            margin-bottom: 20px;
+            color: #fff;
+            font-size: 14px;
+            text-align: left;
+        }
+
+        .controls-info h3 {
+            color: #0ff;
+            margin-bottom: 10px;
+        }
+
+        .controls-info p {
+            margin: 5px 0;
+        }
+
+        .btn {
+            background: linear-gradient(180deg, #0066cc 0%, #004499 100%);
+            border: 2px solid #0088ff;
+            color: #fff;
+            padding: 15px 40px;
+            font-size: 20px;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .btn:hover {
+            background: linear-gradient(180deg, #0088ff 0%, #0066cc 100%);
+            box-shadow: 0 0 20px #0088ff;
+            transform: translateY(-2px);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .powerup-indicator {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+        }
+
+        .powerup-bar {
+            width: 40px;
+            height: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid #ff6b6b;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .powerup-fill {
+            height: 100%;
+            background: #ff6b6b;
+            width: 100%;
+            transition: width 0.3s;
+        }
+
+        .powerup-fill.multi { background: #00ff88; }
+        .powerup-fill.triple { background: #ff00ff; }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div class="ui-layer">
+            <div class="hud">
+                <div class="hud-item">
+                    <div>SCORE: <span id="scoreDisplay">0</span></div>
+                    <div style="font-size: 12px; color: #aaa;">HIGH: <span id="highScoreDisplay">0</span></div>
+                </div>
+                <div class="hud-item">
+                    <div>LIVES: <span id="livesDisplay">3</span></div>
+                </div>
+                <div class="hud-item">
+                    <div>LEVEL: <span id="levelDisplay">1</span></div>
+                </div>
+            </div>
+            
+            <div class="powerup-indicator hidden" id="powerupIndicator">
+                <div class="powerup-bar"><div class="powerup-fill" id="multiBar"></div></div>
+                <div class="powerup-bar"><div class="powerup-fill triple" id="tripleBar"></div></div>
+            </div>
+        </div>
+
+        <div class="start-screen" id="startScreen">
+            <div class="screen-title">GALAGA CLONE</div>
+            <div class="screen-subtitle">
+                Defend Earth from the alien invasion!<br>
+                Destroy enemies, collect power-ups, survive!
+            </div>
+            <div class="controls-info">
+                <h3>CONTROLS</h3>
+                <p><strong>Arrow Keys / WASD</strong> - Move spaceship</p>
+                <p><strong>Spacebar</strong> - Shoot</p>
+                <p><strong>P</strong> - Pause game</p>
+                <p><strong>R</strong> - Restart after game over</p>
+            </div>
+            <button class="btn" id="startBtn">START GAME</button>
+        </div>
+
+        <div class="game-over-screen hidden" id="gameOverScreen">
+            <div class="screen-title">GAME OVER</div>
+            <div class="screen-subtitle">
+                Final Score: <span id="finalScore">0</span><br>
+                Level Reached: <span id="finalLevel">1</span>
+            </div>
+            <button class="btn" id="restartBtn">PLAY AGAIN</button>
+        </div>
+
+        <div class="pause-screen hidden" id="pauseScreen">
+            <div class="screen-title">PAUSED</div>
+            <div class="screen-subtitle">Press P to resume</div>
+            <button class="btn" id="resumeBtn">RESUME</button>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
