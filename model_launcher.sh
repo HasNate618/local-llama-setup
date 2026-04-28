@@ -74,7 +74,8 @@ stop() {
     fi
     rm -f "$PIDFILE"
   else
-    echo "No PID file found at $PIDFILE; no server stopped"
+    echo "No PID file, trying pkill fallback..."
+    pkill -f "llama-server.*8081" || echo "No server on port 8081"
   fi
 }
 
