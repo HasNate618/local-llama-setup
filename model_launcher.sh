@@ -1,5 +1,5 @@
 #!/bin/bash
-# Minimal model launcher — only the requested profiles
+# Minimal model launcher — gemma-4b, gemma-26b, qwen-moe variants
 
 LLAMA_SERVER_BIN="${HOME}/AI/llama.cpp/build/bin/llama-server"
 MODELS_DIR="${HOME}/AI/models"
@@ -11,12 +11,11 @@ mkdir -p "$LOGS_DIR"
 PIDFILE="$LOGS_DIR/llama-server.pid"
 
 QWEN_MODEL="$MODELS_DIR/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"
+QWEN_XL_MODEL="$MODELS_DIR/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf"
 QWEN_MMP="$MODELS_DIR/mmproj-F16.gguf"
 GEMMA_26B="$MODELS_DIR/gemma-4-26B-A4B-it-uncensored-heretic-Q5_K_M.gguf"
 GEMMA_26B_MMP="$MODELS_DIR/gemma-4-26B-A4B-it-mmproj-BF16.gguf"
 GEMMA_4B="$MODELS_DIR/gemma-4-E4B-it-Q4_K_M.gguf"
-SUSHI_9B="$MODELS_DIR/Qwen3.5-9b-Sushi-Coder-RL.Q4_K_M.gguf"
-SUSHI_MMP="$MODELS_DIR/Qwen3.5-9b-Sushi-Coder-RL.BF16-mmproj.gguf"
 
 _wait_health() {
   local t=${1:-60}; local i=0
@@ -33,7 +32,6 @@ _start() {
   local extra_args=("$@")
   if [ ! -f "$model" ]; then echo "Model not found: $model"; return 1; fi
   local log="$LOGS_DIR/${tag}_$(date +%Y%m%d_%H%M%S).log"
-  # record the actual command for debugging
   echo "CMD: $LLAMA_SERVER_BIN -m $model --host $SERVER_HOST --port $SERVER_PORT --no-webui ${extra_args[*]}" >> "$log"
   nohup "$LLAMA_SERVER_BIN" -m "$model" --host "$SERVER_HOST" --port "$SERVER_PORT" --no-webui "${extra_args[@]}" > "$log" 2>&1 &
   echo $! > "$PIDFILE"
@@ -41,23 +39,24 @@ _start() {
   if _wait_health 120; then echo "Server healthy"; else echo "Server health did not appear; check $log"; fi
 }
 
-qwen-moe() {
-  if [ ! -f "$QWEN_MMP" ]; then echo "Missing mmproj: $QWEN_MMP"; return 1; fi
-  # Best observed config from targeted tuning on RTX4060 (~8GB)
-  _start "$QWEN_MODEL" qwen-moe --mmproj "$QWEN_MMP" --no-mmproj-offload --kv-unified --n-gpu-layers 12 --no-mmap --cache-ram 0 --ctx-size 131072 --batch-size 256 --ubatch-size 128 --n-cpu-moe 0 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on -ctk q8_0 -ctv q8_0 --reasoning on --reasoning-budget 256 --temp 0.6 --top-p 0.95 --top-k 20
-}
-
-gemma-26b() {
-  _start "$GEMMA_26B" gemma-26b --mmproj "$GEMMA_26B_MMP" --media-path "$HOME" --ctx-size 131072 --batch-size 1024 --ubatch-size 512 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on
-}
-
 gemma-4b() {
   _start "$GEMMA_4B" gemma-4b --ctx-size 131072 --batch-size 1024 --ubatch-size 512 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on
 }
 
-sushi() {
-  if [ ! -f "$SUSHI_MMP" ]; then echo "Sushi mmproj missing: $SUSHI_MMP"; fi
-  _start "$SUSHI_9B" sushi --mmproj "$SUSHI_MMP" --media-path "$HOME" --ctx-size 32768 --batch-size 512 --ubatch-size 256 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on
+gemma-26b() {
+  if [ ! -f "$GEMMA_26B_MMP" ]; then echo "Missing mmproj: $GEMMA_26B_MMP"; return 1; fi
+  # --no-mmproj-offload required to avoid OOM with BF16 mmproj on RTX 4060
+  _start "$GEMMA_26B" gemma-26b --mmproj "$GEMMA_26B_MMP" --media-path "$HOME" --no-mmproj-offload --ctx-size 131072 --batch-size 1024 --ubatch-size 512 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on
+}
+
+qwen-moe() {
+  if [ ! -f "$QWEN_MMP" ]; then echo "Missing mmproj: $QWEN_MMP"; return 1; fi
+  _start "$QWEN_MODEL" qwen-moe --mmproj "$QWEN_MMP" --no-mmproj-offload --kv-unified --n-gpu-layers 12 --no-mmap --cache-ram 0 --ctx-size 131072 --batch-size 256 --ubatch-size 128 --n-cpu-moe 0 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on -ctk q8_0 -ctv q8_0 --reasoning on --reasoning-budget 256 --temp 0.6 --top-p 0.95 --top-k 20
+}
+
+qwen-moe-xl() {
+  if [ ! -f "$QWEN_MMP" ]; then echo "Missing mmproj: $QWEN_MMP"; return 1; fi
+  _start "$QWEN_XL_MODEL" qwen-moe-xl --mmproj "$QWEN_MMP" --no-mmproj-offload --kv-unified --n-gpu-layers 12 --no-mmap --cache-ram 0 --ctx-size 131072 --batch-size 256 --ubatch-size 128 --n-cpu-moe 0 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on -ctk q8_0 -ctv q8_0 --reasoning on --reasoning-budget 256 --temp 0.6 --top-p 0.95 --top-k 20
 }
 
 stop() {
@@ -91,25 +90,23 @@ help() {
   cat <<EOF
 Usage: model_launcher.sh <command>
 Commands:
-  qwen-moe   Start Qwen3.6 35B (benchmarked)
-  gemma-26b  Start Gemma 26B multimodal
-  gemma-4b   Start Gemma 4B
-  sushi      Start Sushi 9B multimodal
-  stop       Stop servers
-  status     Show running server
-  logs       Show recent logs
+  qwen-moe      Start Qwen3.6 35B (Q4_K_M, benchmarked)
+  qwen-moe-xl   Start Qwen3.6 35B (Q4_K_XL, optimized)
+  gemma-26b    Start Gemma 26B multimodal
+  gemma-4b     Start Gemma 4B
+  stop         Stop servers
+  status       Show running server
+  logs         Show recent logs
 EOF
 }
 
-# Backward-compatible dispatcher function for interactive shells
 llama() {
   local cmd=$1; shift || true
   case "$cmd" in
     qwen-moe) qwen-moe "$@" ;;
-    qwen-moe-unsloth) qwen-moe-unsloth "$@" ;;
+    qwen-moe-xl) qwen-moe-xl "$@" ;;
     gemma-26b) gemma-26b "$@" ;;
     gemma-4b) gemma-4b "$@" ;;
-    sushi) sushi "$@" ;;
     stop) stop "$@" ;;
     status) status "$@" ;;
     logs) logs "$@" ;;
@@ -122,13 +119,12 @@ export -f llama >/dev/null 2>&1 || true
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   case "$1" in
   qwen-moe) qwen-moe ;;
-    
+  qwen-moe-xl) qwen-moe-xl ;;
   gemma-26b) gemma-26b ;;
-    gemma-4b) gemma-4b ;;
-    sushi) sushi ;;
-    stop) stop ;;
-    status) status ;;
-    logs) logs ;;
-    help|""|*) help ;;
+  gemma-4b) gemma-4b ;;
+  stop) stop ;;
+  status) status ;;
+  logs) logs ;;
+  help|""|*) help ;;
   esac
 fi
