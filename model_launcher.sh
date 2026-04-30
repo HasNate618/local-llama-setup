@@ -10,8 +10,7 @@ SERVER_PORT="8081"
 mkdir -p "$LOGS_DIR"
 PIDFILE="$LOGS_DIR/llama-server.pid"
 
-QWEN_MODEL="$MODELS_DIR/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf"
-QWEN_XL_MODEL="$MODELS_DIR/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf"
+QWEN_MODEL="$MODELS_DIR/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf"
 QWEN_MMP="$MODELS_DIR/mmproj-F16.gguf"
 GEMMA_26B="$MODELS_DIR/gemma-4-26B-A4B-it-uncensored-heretic-Q5_K_M.gguf"
 GEMMA_26B_MMP="$MODELS_DIR/gemma-4-26B-A4B-it-mmproj-BF16.gguf"
@@ -55,12 +54,6 @@ qwen-moe() {
   _start "$QWEN_MODEL" qwen-moe --mmproj "$QWEN_MMP" --no-mmproj-offload --kv-unified --n-gpu-layers 12 --no-mmap --cache-ram 0 --ctx-size 81920 --batch-size 256 --ubatch-size 128 --n-cpu-moe 0 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on -ctk q8_0 -ctv q8_0 --reasoning on --reasoning-budget 256 --temp 0.6 --top-p 0.95 --top-k 20
 }
 
-qwen-moe-xl() {
-  if [ ! -f "$QWEN_MMP" ]; then echo "Missing mmproj: $QWEN_MMP"; return 1; fi
-  # 80k ctx (81920) - optimized for RTX 4060 performance
-  _start "$QWEN_XL_MODEL" qwen-moe-xl --mmproj "$QWEN_MMP" --no-mmproj-offload --kv-unified --n-gpu-layers 12 --no-mmap --cache-ram 0 --ctx-size 81920 --batch-size 256 --ubatch-size 128 --n-cpu-moe 0 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on -ctk q8_0 -ctv q8_0 --reasoning on --reasoning-budget 256 --temp 0.6 --top-p 0.95 --top-k 20
-}
-
 stop() {
   if [ -f "$PIDFILE" ]; then
     old_pid=$(cat "$PIDFILE" || true)
@@ -93,13 +86,12 @@ help() {
   cat <<EOF
 Usage: model_launcher.sh <command>
 Commands:
-  qwen-moe      Start Qwen3.6 35B (Q4_K_M, benchmarked)
-  qwen-moe-xl   Start Qwen3.6 35B (Q4_K_XL, optimized)
-  gemma-26b    Start Gemma 26B multimodal
-  gemma-4b     Start Gemma 4B
-  stop         Stop servers
-  status       Show running server
-  logs         Show recent logs
+  qwen-moe     Start Qwen3.6 35B (Q4_K_XL, 80k ctx)
+  gemma-26b   Start Gemma 26B multimodal
+  gemma-4b    Start Gemma 4B
+  stop        Stop servers
+  status      Show running server
+  logs        Show recent logs
 EOF
 }
 
@@ -107,7 +99,6 @@ llama() {
   local cmd=$1; shift || true
   case "$cmd" in
     qwen-moe) qwen-moe "$@" ;;
-    qwen-moe-xl) qwen-moe-xl "$@" ;;
     gemma-26b) gemma-26b "$@" ;;
     gemma-4b) gemma-4b "$@" ;;
     stop) stop "$@" ;;
@@ -122,7 +113,6 @@ export -f llama >/dev/null 2>&1 || true
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
   case "$1" in
   qwen-moe) qwen-moe ;;
-  qwen-moe-xl) qwen-moe-xl ;;
   gemma-26b) gemma-26b ;;
   gemma-4b) gemma-4b ;;
   stop) stop ;;
