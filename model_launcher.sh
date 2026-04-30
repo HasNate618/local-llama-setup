@@ -51,12 +51,14 @@ gemma-26b() {
 
 qwen-moe() {
   if [ ! -f "$QWEN_MMP" ]; then echo "Missing mmproj: $QWEN_MMP"; return 1; fi
-  _start "$QWEN_MODEL" qwen-moe --mmproj "$QWEN_MMP" --no-mmproj-offload --kv-unified --n-gpu-layers 12 --no-mmap --cache-ram 0 --ctx-size 131072 --batch-size 256 --ubatch-size 128 --n-cpu-moe 0 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on -ctk q8_0 -ctv q8_0 --reasoning on --reasoning-budget 256 --temp 0.6 --top-p 0.95 --top-k 20
+  # 80k ctx (81920) - optimized for RTX 4060 performance
+  _start "$QWEN_MODEL" qwen-moe --mmproj "$QWEN_MMP" --no-mmproj-offload --kv-unified --n-gpu-layers 12 --no-mmap --cache-ram 0 --ctx-size 81920 --batch-size 256 --ubatch-size 128 --n-cpu-moe 0 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on -ctk q8_0 -ctv q8_0 --reasoning on --reasoning-budget 256 --temp 0.6 --top-p 0.95 --top-k 20
 }
 
 qwen-moe-xl() {
   if [ ! -f "$QWEN_MMP" ]; then echo "Missing mmproj: $QWEN_MMP"; return 1; fi
-  _start "$QWEN_XL_MODEL" qwen-moe-xl --mmproj "$QWEN_MMP" --no-mmproj-offload --kv-unified --n-gpu-layers 12 --no-mmap --cache-ram 0 --ctx-size 131072 --batch-size 256 --ubatch-size 128 --n-cpu-moe 0 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on -ctk q8_0 -ctv q8_0 --reasoning on --reasoning-budget 256 --temp 0.6 --top-p 0.95 --top-k 20
+  # 80k ctx (81920) - optimized for RTX 4060 performance
+  _start "$QWEN_XL_MODEL" qwen-moe-xl --mmproj "$QWEN_MMP" --no-mmproj-offload --kv-unified --n-gpu-layers 12 --no-mmap --cache-ram 0 --ctx-size 81920 --batch-size 256 --ubatch-size 128 --n-cpu-moe 0 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on -ctk q8_0 -ctv q8_0 --reasoning on --reasoning-budget 256 --temp 0.6 --top-p 0.95 --top-k 20
 }
 
 stop() {
