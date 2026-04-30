@@ -50,8 +50,8 @@ gemma-26b() {
 
 qwen-moe() {
   if [ ! -f "$QWEN_MMP" ]; then echo "Missing mmproj: $QWEN_MMP"; return 1; fi
-  # 80k ctx (81920) - optimized for RTX 4060 performance
-  _start "$QWEN_MODEL" qwen-moe --mmproj "$QWEN_MMP" --no-mmproj-offload --kv-unified --n-gpu-layers 12 --no-mmap --cache-ram 0 --ctx-size 81920 --batch-size 256 --ubatch-size 128 --n-cpu-moe 0 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on -ctk q8_0 -ctv q8_0 --reasoning on --reasoning-budget 256 --temp 0.6 --top-p 0.95 --top-k 20
+  # 80k ctx, ngl=12, no kv-unified -> ~13 tok/s on RTX 4060
+  _start "$QWEN_MODEL" qwen-moe --mmproj "$QWEN_MMP" --no-mmproj-offload --n-gpu-layers 12 --no-mmap --cache-ram 0 --ctx-size 81920 --batch-size 256 --ubatch-size 128 --n-cpu-moe 0 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on -ctk q8_0 -ctv q8_0 --reasoning on --reasoning-budget 256 --temp 0.6 --top-p 0.95 --top-k 20
 }
 
 stop() {
