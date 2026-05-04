@@ -44,8 +44,8 @@ gemma-4b() {
 
 gemma-26b() {
   if [ ! -f "$GEMMA_26B_MMP" ]; then echo "Missing mmproj: $GEMMA_26B_MMP"; return 1; fi
-  # --no-mmproj-offload required to avoid OOM with BF16 mmproj on RTX 4060
-  _start "$GEMMA_26B" gemma-26b --mmproj "$GEMMA_26B_MMP" --media-path "$HOME" --no-mmproj-offload --ctx-size 131072 --batch-size 1024 --ubatch-size 512 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on
+  # 80k ctx, --fit on, bs=1024 -> ~24 tok/s on RTX 4060
+  _start "$GEMMA_26B" gemma-26b --mmproj "$GEMMA_26B_MMP" --media-path "$HOME" --no-mmproj-offload --fit on --ctx-size 81920 --batch-size 1024 --ubatch-size 512 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on
 }
 
 qwen-moe() {
