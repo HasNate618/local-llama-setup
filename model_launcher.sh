@@ -11,9 +11,9 @@ mkdir -p "$LOGS_DIR"
 PIDFILE="$LOGS_DIR/llama-server.pid"
 
 QWEN_MODEL="$MODELS_DIR/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf"
-QWEN_MMP="$MODELS_DIR/mmproj-F16.gguf"
+QWEN_MMP="$MODELS_DIR/mmproj-qwen3.6-f16.gguf"
 GEMMA_26B="$MODELS_DIR/gemma-4-26B-A4B-it-uncensored-heretic-Q5_K_M.gguf"
-GEMMA_26B_MMP="$MODELS_DIR/gemma-4-26B-A4B-it-mmproj-BF16.gguf"
+GEMMA_26B_MMP="$MODELS_DIR/mmproj-gemma4-26b-bf16.gguf"
 GEMMA_4B="$MODELS_DIR/gemma-4-E4B-it-Q4_K_M.gguf"
 
 _wait_health() {
