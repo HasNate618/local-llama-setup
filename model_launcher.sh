@@ -10,10 +10,10 @@ SERVER_PORT="8081"
 mkdir -p "$LOGS_DIR"
 PIDFILE="$LOGS_DIR/llama-server.pid"
 
-QWEN_MODEL="$MODELS_DIR/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf"
+QWEN_MODEL="$MODELS_DIR/Qwen3.6-35B-A3B-MTP-Q4_K_M.gguf"
 QWEN_MMP="$MODELS_DIR/mmproj-qwen3.6-f16.gguf"
-GEMMA_26B="$MODELS_DIR/gemma-4-26B-A4B-it-uncensored-heretic-Q5_K_M.gguf"
-GEMMA_26B_MMP="$MODELS_DIR/mmproj-gemma4-26b-bf16.gguf"
+GEMMA_26B="$MODELS_DIR/gemma-4-26B-A4B-it-UD-Q4_K_XL.gguf"
+GEMMA_26B_MMP="$MODELS_DIR/mmproj-BF16.gguf"
 GEMMA_4B="$MODELS_DIR/gemma-4-E4B-it-Q4_K_M.gguf"
 
 _wait_health() {
@@ -44,14 +44,14 @@ gemma-4b() {
 
 gemma-26b() {
   if [ ! -f "$GEMMA_26B_MMP" ]; then echo "Missing mmproj: $GEMMA_26B_MMP"; return 1; fi
-  # 80k ctx, --fit on, bs=1024 -> ~24 tok/s on RTX 4060
-  _start "$GEMMA_26B" gemma-26b --mmproj "$GEMMA_26B_MMP" --media-path "$HOME" --no-mmproj-offload --fit on --ctx-size 81920 --batch-size 1024 --ubatch-size 512 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on
+  # 32k ctx, --fit on, bs=1024 -> ~25 tok/s on RTX 4060
+  _start "$GEMMA_26B" gemma-26b --mmproj "$GEMMA_26B_MMP" --media-path "$HOME" --no-mmproj-offload --fit on --ctx-size 32768 --batch-size 1024 --ubatch-size 512 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on
 }
 
 qwen-moe() {
   if [ ! -f "$QWEN_MMP" ]; then echo "Missing mmproj: $QWEN_MMP"; return 1; fi
-  # 80k ctx, ngl=12, no kv-unified -> ~13 tok/s on RTX 4060
-  _start "$QWEN_MODEL" qwen-moe --mmproj "$QWEN_MMP" --no-mmproj-offload --n-gpu-layers 12 --no-mmap --cache-ram 0 --ctx-size 81920 --batch-size 256 --ubatch-size 128 --n-cpu-moe 0 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on -ctk q8_0 -ctv q8_0 --reasoning on --reasoning-budget 256 --temp 0.6 --top-p 0.95 --top-k 20
+  # MTP model, 80k ctx, ngl=9, spec n=3 -> ~14 tok/s on RTX 4060
+  _start "$QWEN_MODEL" qwen-moe --mmproj "$QWEN_MMP" --no-mmproj-offload --n-gpu-layers 9 --no-mmap --cache-ram 0 --ctx-size 81920 --batch-size 256 --ubatch-size 128 --n-cpu-moe 0 --threads 10 --threads-batch 10 --parallel 1 --flash-attn on -ctk q8_0 -ctv q8_0 --spec-type mtp --spec-draft-n-max 3
 }
 
 stop() {
