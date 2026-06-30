@@ -1,18 +1,6 @@
-# Local assets and large files
 models/
-llama.cpp/
 logs/
-*.gguf
+ik_llama.cpp/
+atomic-llama.cpp/
 *.log
-bench_runner.sh
-run_*.sh
-mcp-servers/
-copilot-openai-server/
-searxng-docker/
-Vault/
-Cursor-To-OpenAI/
-*.pyc
-__pycache__/
-/.vscode/
-.DS_Store
-itt
+*.pid
