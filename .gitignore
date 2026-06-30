@@ -1,6 +1,13 @@
-models/
-logs/
+# Build artifacts
 ik_llama.cpp/
 atomic-llama.cpp/
+result
+
+# Runtime data
+models/
+logs/
 *.log
 *.pid
+
+# Nix
+result-*

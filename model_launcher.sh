@@ -1,133 +1,67 @@
-#!/bin/bash
-# llama.cpp model launcher — multi-model support with MTP
-# Updated for ik_llama.cpp (MTP CUDA fixes) + NixOS
+#!/usr/bin/env bash
+# llama-server wrapper — multi-model support
+set -euo pipefail
 
-# ik_llama.cpp binary (MTP support, CUDA fixes for RTX 4060)
-IK_LLAMA_BIN="${HOME}/AI/ik_llama.cpp/build/bin/llama-server"
-# Main llama.cpp binary (NixOS system, no MTP)
-MAIN_LLAMA_BIN="/run/current-system/sw/bin/llama-server"
+# CUDA driver runtime (NixOS)
+export LD_LIBRARY_PATH="/run/opengl-driver/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
-MODELS_DIR="${HOME}/AI/models"
-LOGS_DIR="${HOME}/AI/logs"
-SERVER_HOST="0.0.0.0"
-SERVER_PORT="11434"
+MODELS_DIR="/home/nate/AI/models"
+LOGS_DIR="/home/nate/AI/logs"
+HOST="0.0.0.0"
+PORT="11434"
+PIDFILE="${LOGS_DIR}/llama-server.pid"
+
+# ik_llama.cpp binary (MTP support)
+IK_LLAMA="/home/nate/AI/ik_llama.cpp/build/bin/llama-server"
 
 mkdir -p "$LOGS_DIR"
-PIDFILE="$LOGS_DIR/llama-server.pid"
 
-# Model files
-ORNITH_MODEL="$MODELS_DIR/ornith-1.0-35b-Q4_K_M-MTP.gguf"
-ORNITH_MMP="$MODELS_DIR/ornith-mmproj-F16.gguf"
-QWEN_MODEL="$MODELS_DIR/Qwen3.6-35B-A3B-uncensored-heretic-Native-MTP-Preserved-Q4_K_M.gguf"
+# Model definitions: name|file|ctx|extra_flags
+declare -A MODELS=(
+  ["ornith"]="ornith-1.0-35b-Q4_K_M-MTP.gguf|131072|--spec-type \"mtp:n_max=3,p_min=0.0\" --fit --no-mmap -cram 0 -b 512 -ub 256 --flash-attn on -ctk q8_0 -ctv q8_0 --jinja"
+  ["qwen"]="Qwen3.6-35B-A3B-uncensored-heretic-Native-MTP-Preserved-Q4_K_M.gguf|131072|--spec-type \"mtp:n_max=3,p_min=0.0\" --fit --no-mmap -cram 0 -b 512 -ub 256 --flash-attn on -ctk q8_0 -ctv q8_0 --jinja"
+)
 
-_wait_health() {
-  local t=${1:-120}; local i=0
-  while [ $i -lt $t ]; do
-    if curl -fsS "http://127.0.0.1:${SERVER_PORT}/health" >/dev/null 2>&1; then return 0; fi
-    sleep 1; i=$((i+1))
-  done
-  return 1
-}
+ACTION="${1:-help}"
 
-_start() {
-  local model=$1; shift
-  local tag=$1; shift
-  local extra_args=("$@")
-  local bin="${IK_LLAMA_BIN}"
-  # if the first extra arg is a --bin path, use it
-  if [[ "${extra_args[0]}" == --bin ]]; then
-    bin="${extra_args[1]}"
-    extra_args=("${extra_args[@]:2}")
-  fi
-  if [ ! -f "$model" ]; then echo "Model not found: $model"; return 1; fi
-  local log="$LOGS_DIR/${tag}_$(date +%Y%m%d_%H%M%S).log"
-  echo "CMD: $bin -m $model --host $SERVER_HOST --port $SERVER_PORT ${extra_args[*]}" >> "$log"
-  nohup "$bin" -m "$model" --host "$SERVER_HOST" --port "$SERVER_PORT" "${extra_args[@]}" > "$log" 2>&1 &
-  echo $! > "$PIDFILE"
-  echo "Starting $tag -> $log (pid $(cat "$PIDFILE" 2>/dev/null))"
-  if _wait_health 120; then echo "Server healthy"; else echo "Server health did not appear; check $log"; fi
-}
-
-# === MODEL PROFILES ===
-
-ornith() {
-  # Ornith 35B MTP — coding model, ~35-46 t/s on RTX 4060
-  # ik_llama.cpp with MTP, 128K ctx, --fit auto-offload
-  _start "$ORNITH_MODEL" ornith \
-    --spec-type "mtp:n_max=3,p_min=0.0" \
-    --fit --no-mmap -cram 0 \
-    -b 512 -ub 256 \
-    --flash-attn on -ctk q8_0 -ctv q8_0 \
-    --ctx-size 131072 \
-    --parallel 1 \
-    --jinja
-}
-
-ornith-vision() {
-  # Ornith 35B MTP + vision
-  if [ ! -f "$ORNITH_MMP" ]; then echo "Missing mmproj: $ORNITH_MMP"; return 1; fi
-  _start "$ORNITH_MODEL" ornith-vision \
-    --mmproj "$ORNITH_MMP" \
-    --spec-type "mtp:n_max=3,p_min=0.0" \
-    --fit --no-mmap -cram 0 \
-    -b 512 -ub 256 \
-    --flash-attn on -ctk q8_0 -ctv q8_0 \
-    --ctx-size 131072 \
-    --parallel 1 \
-    --jinja
-}
-
-qwen() {
-  # Qwen 3.6 35B Uncensored — general chat, ~35 t/s with MTP
-  # Uses ik_llama.cpp for MTP support (crashes on main llama.cpp)
-  _start "$QWEN_MODEL" qwen \
-    --spec-type "mtp:n_max=3,p_min=0.0" \
-    --fit --no-mmap -cram 0 \
-    -b 512 -ub 256 \
-    --flash-attn on -ctk q8_0 -ctv q8_0 \
-    --ctx-size 131072 \
-    --parallel 1 \
-    --jinja
-}
-
-# === SERVER COMMANDS ===
-
-stop() {
-  if [ -f "$PIDFILE" ]; then
-    old_pid=$(cat "$PIDFILE" || true)
-    if [ -n "${old_pid:-}" ] && kill -0 "$old_pid" 2>/dev/null; then
-      echo "Stopping server pid $old_pid"
-      kill "$old_pid" || true
-      for _ in {1..30}; do
-        kill -0 "$old_pid" 2>/dev/null || break
-        sleep 1
-      done
+# Commands that don't need a model
+case "$ACTION" in
+  stop)
+    if [ -f "$PIDFILE" ]; then
+      old_pid=$(cat "$PIDFILE" || true)
+      if [ -n "${old_pid:-}" ] && kill -0 "$old_pid" 2>/dev/null; then
+        echo "Stopping server pid $old_pid"
+        kill "$old_pid" || true
+        for _ in $(seq 1 30); do
+          kill -0 "$old_pid" 2>/dev/null || break
+          sleep 1
+        done
+        echo "Stopped"
+      else
+        echo "No running server with pid $old_pid"
+      fi
+      rm -f "$PIDFILE"
     else
-      echo "No running server with pid $old_pid"
+      echo "No PID file, trying pkill fallback..."
+      pkill -f "llama-server.*${PORT}" || echo "No server on port $PORT"
     fi
-    rm -f "$PIDFILE"
-  else
-    echo "No PID file, trying pkill fallback..."
-    pkill -f "llama-server.*${SERVER_PORT}" || echo "No server on port $SERVER_PORT"
-  fi
-}
-
-status() {
-  pgrep -af llama-server || echo "no server"
-}
-
-logs() {
-  ls -lt "$LOGS_DIR" | head -20
-}
-
-help() {
-  cat <<EOF
+    exit 0
+    ;;
+  status)
+    pgrep -af llama-server || echo "no server"
+    exit 0
+    ;;
+  logs)
+    ls -lt "$LOGS_DIR" | head -20
+    exit 0
+    ;;
+  help)
+    cat <<EOF
 Usage: llama <model> [start]
 
 Models:
-  ornith        Ornith 35B MTP — coding, ~35-46 t/s
-  ornith-vision Ornith 35B MTP + vision
-  qwen          Qwen 3.6 35B Uncensored — general, ~35 t/s
+  ornith   Ornith 35B MTP — coding, ~35-46 t/s
+  qwen     Qwen 3.6 35B Uncensored — general, ~35 t/s
 
 Commands:
   start   Start the server (default)
@@ -140,24 +74,82 @@ Examples:
   llama qwen            Start Qwen (uncensored)
   llama stop            Stop any running server
   llama status          Check if server is running
-
-Performance (RTX 4060 8GB, ik_llama.cpp):
-  ornith MTP:  35-46 t/s, 73-94% acceptance
-  qwen MTP:    35 t/s, 71-75% acceptance
-  (vs no MTP:  13 t/s baseline)
 EOF
+    exit 0
+    ;;
+esac
+
+# Remaining commands need a model
+MODEL_KEY="$ACTION"
+shift 2>/dev/null || true
+ACTION="${1:-start}"
+
+if [[ -z "${MODELS[$MODEL_KEY]+x}" ]]; then
+  echo "Unknown model: $MODEL_KEY"
+  echo "Run 'llama help' to see available models."
+  exit 1
+fi
+
+IFS='|' read -r MODEL_FILE MODEL_CTX MODEL_EXTRA <<< "${MODELS[$MODEL_KEY]}"
+MODEL_PATH="${MODELS_DIR}/${MODEL_FILE}"
+LLAMA_BIN="$IK_LLAMA"
+
+_wait_health() {
+  local t=${1:-120}
+  for i in $(seq 1 "$t"); do
+    if curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
+      echo "Server healthy"
+      return 0
+    fi
+    sleep 1
+  done
+  echo "Health check timed out after ${t}s"
+  return 1
 }
 
-# === DISPATCHER ===
+start() {
+  if [ -f "$PIDFILE" ]; then
+    old_pid=$(cat "$PIDFILE" 2>/dev/null || true)
+    if [ -n "${old_pid:-}" ] && kill -0 "$old_pid" 2>/dev/null; then
+      echo "Server already running (pid $old_pid). Stop first."
+      return 1
+    fi
+    rm -f "$PIDFILE"
+  fi
 
-ACTION="${1:-help}"
+  if [ ! -f "$MODEL_PATH" ]; then
+    echo "Model not found: $MODEL_PATH"
+    return 1
+  fi
+
+  if [ ! -x "$LLAMA_BIN" ]; then
+    echo "Binary not found: $LLAMA_BIN"
+    return 1
+  fi
+
+  local log="${LOGS_DIR}/${MODEL_KEY}_$(date +%Y%m%d_%H%M%S).log"
+
+  echo "Starting $MODEL_KEY: ctx=$MODEL_CTX"
+
+  eval set -- $MODEL_EXTRA
+  local extra_args=("$@")
+
+  nohup "$LLAMA_BIN" \
+    -m "$MODEL_PATH" \
+    --host "$HOST" \
+    --port "$PORT" \
+    --ctx-size "$MODEL_CTX" \
+    --log-file "${LOGS_DIR}/${MODEL_KEY}_server" \
+    "${extra_args[@]}" \
+    > "$log" 2>&1 &
+
+  echo $! > "$PIDFILE"
+  echo "Starting server -> $log (pid $(cat "$PIDFILE"))"
+
+  _wait_health 120
+}
 
 case "$ACTION" in
-  ornith)       ornith ;;
-  ornith-vision) ornith-vision ;;
-  qwen)         qwen ;;
-  stop)         stop ;;
-  status)       status ;;
-  logs)         logs ;;
-  help|*)       help ;;
+  start)  start ;;
+  *)      echo "Unknown action: $ACTION" ;;
 esac
